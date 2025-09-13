@@ -1,0 +1,100 @@
+package com.example.entity;
+
+import javax.persistence.*;
+
+@Entity
+@Table(name="track")
+public class Track {
+
+     @Column (name="trackId")
+     @Id @GeneratedValue
+    private Integer trackId;
+
+    @Column (name="trackArtist")
+    private String trackArtist;
+
+    public Track(){
+    }
+    /**
+     * @param trackArtist
+     */
+    public Track(String trackName, String trackArtist) {
+        this.trackName = trackName;
+        this.trackArtist = trackArtist;
+    }
+    /**
+     * @param trackId
+     * @param trackName
+     * @param trackArtist
+     */
+    public Track(Integer trackId, String trackName, String trackArtist) {
+        this.trackId = trackId;
+        this.trackName = trackName;
+        this.trackArtist = trackArtist;
+    }
+
+    public Integer getTrackId() {
+        return trackId;
+    }
+
+    public void setTrackId(Integer trackId) {
+        this.trackId = trackId;
+    }
+
+    public String getTrackName(){
+        return trackName;
+    }
+
+    public String setTrackName(){
+        this.trackName = trackName;
+    }
+
+    public Integer getTrackArtist() {
+        return trackArtist;
+    }
+
+    public void setTrackArtist(String trackArtist) {
+        this.trackArtist = trackArtist;
+    }
+    
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		Message other = (Message) obj;
+		if (messageId == null) {
+			if (other.messageId != null)
+				return false;
+		} else if (!messageId.equals(other.messageId))
+			return false;
+		if (messageText == null) {
+			if (other.messageText != null)
+				return false;
+		} else if (!messageText.equals(other.messageText))
+			return false;
+		if (postedBy == null) {
+			if (other.postedBy != null)
+				return false;
+		} else if (!postedBy.equals(other.postedBy))
+			return false;
+		if (timePostedEpoch == null) {
+			if (other.timePostedEpoch != null)
+				return false;
+		} else if (!timePostedEpoch.equals(other.timePostedEpoch))
+			return false;
+		return true;
+	}
+	
+    @Override
+    public String toString() {
+        return "Track: " + trackName +
+                ", trackId=" + trackId +
+                ", trackArtist=" + trackArtist;
+    }
+
+
+}

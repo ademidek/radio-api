@@ -4,10 +4,10 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class RadioApiApplication {
+public class TrackService {
 
 	public static void main(String[] args) {
-		SpringApplication.run(RadioApiApplication.class, args);
+		SpringApplication.run(TrackService.class, args);
 	}
 
 }
