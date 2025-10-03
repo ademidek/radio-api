@@ -1,5 +1,8 @@
 package com.example.api.dto;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
 public class TrackDTO {
 
     @NotBlank
@@ -9,6 +12,8 @@ public class TrackDTO {
     @NotBlank
     @Size(max = 100)
     private String trackArtist;
+
+    public TrackDTO(){}
 
     public String getTrackName() {
         return trackName;
