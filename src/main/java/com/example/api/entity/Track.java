@@ -17,6 +17,11 @@ public class Track {
     @Column (name="trackName")
     private String trackName;
 
+    @Column(unique=true, length=1024) 
+    private String s3Key;
+
+    private Integer duration;
+
     public Track(){}
 
     public Track(String trackName, String trackArtist) {
@@ -24,10 +29,11 @@ public class Track {
         this.trackArtist = trackArtist;
     }
 
-    public Track(Integer trackId, String trackName, String trackArtist) {
+    public Track(Integer trackId, String trackName, String trackArtist, String s3Key) {
         this.trackId = trackId;
         this.trackName = trackName;
         this.trackArtist = trackArtist;
+        this.s3Key = s3Key;
     }
 
     public Integer getTrackId() {
@@ -52,6 +58,14 @@ public class Track {
 
     public void setTrackArtist(String trackArtist) {
         this.trackArtist = trackArtist;
+    }
+
+    public String getS3Key() {
+        return s3Key;
+    }
+
+    public void setS3Key(String s3Key) {
+        this.s3Key = s3Key;
     }
     
     @Override
