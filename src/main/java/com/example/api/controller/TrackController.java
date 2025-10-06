@@ -19,10 +19,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/tracks")
 public class TrackController {
-    @GetMapping("/")
-    public String index(){
-        return "Welcome to AK(tion) Radio.";
-    }
 
     private final TrackRepository trackRepository;
     private final S3AudioService s3AudioService;
@@ -32,17 +28,41 @@ public class TrackController {
         this.s3AudioService = s3AudioService;
     }
 
-    @GetMapping("/tracks")
+    @GetMapping("/welcome")
+    public String index(){
+        return "Welcome to AK(tion) Radio.";
+    }
+
+    @GetMapping
+    public List<Map<String, Object>> list() {
+        return trackRepository.findAll().stream()
+            .map(track -> {
+                Map<String, Object> map = new java.util.HashMap<>();
+                map.put("id", track.getTrackId());
+                map.put("name", track.getTrackName());
+                map.put("artist", track.getTrackArtist());
+                return map;
+            })
+            .toList();
+    }
+
+    @GetMapping("/show")
     public String showTracks(){
         return "Showing all tracks";
     }
 
-    @GetMapping("/tracks/{id}")
+    @GetMapping("/{id}")
     public Map<String, Object> generatePresignedUrl(@PathVariable Integer id,
                                                @RequestParam(defaultValue = "10") int minutes) {
         Track track = trackRepository.findById(id).orElseThrow(() -> new EntityNotFoundException("Track " + id + " not found"));
-        URL url = s3AudioService.generatePresignedUrl(track.getS3Key());
-        return Map.of("url", url.toString());
+        URL url = s3AudioService.generatePresignedUrl(track.getS3Key(), Duration.ofMinutes(minutes));
+                return Map.of(
+                "id", track.getTrackId(),
+                "name", track.getTrackName(),
+                "artist", track.getTrackArtist(),
+                "expiresInMinutes", minutes,
+                "url", url.toString()
+        );
     }
 
     /*@GetMapping

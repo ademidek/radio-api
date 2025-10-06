@@ -57,7 +57,6 @@
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
-
     <dependency>
       <groupId>software.amazon.awssdk</groupId>
       <artifactId>s3</artifactId>
@@ -66,6 +65,15 @@
       <groupId>software.amazon.awssdk</groupId>
       <artifactId>sts</artifactId>
       <optional>true</optional>
+    </dependency>
+    <dependency>
+    <groupId>org.flywaydb</groupId>
+    <artifactId>flyway-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>runtime</scope>
     </dependency>
   </dependencies>
 
