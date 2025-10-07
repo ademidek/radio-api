@@ -8,18 +8,19 @@ public class Track {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column (name="trackId", , nullable = false)
+    @Column (name="track_id", nullable = false)
     private Integer trackId;
 
-    @Column (name="trackArtist", nullable = false)
+    @Column (name="track_artist", nullable = false)
     private String trackArtist;
 
-    @Column (name="trackName", nullable = false)
+    @Column (name="track_name", nullable = false)
     private String trackName;
 
-    @Column(unique=true, length=1024, nullable = false)
+    @Column(name="s3_key", unique=true, length=1024, nullable = false)
     private String s3Key;
 
+    @Column(name="duration")
     private Integer duration;
 
     public Track(){}
