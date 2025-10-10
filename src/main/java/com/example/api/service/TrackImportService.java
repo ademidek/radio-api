@@ -1,3 +1,13 @@
+package com.example.api.service;
+
+import com.example.api.entity.Track;
+import com.example.api.repository.TrackRepository;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import software.amazon.awssdk.services.s3.S3Client;
+import jakarta.transaction.Transactional;
+import java.util.Objects;
+
 @Service
 public class TrackImportService {
     private final S3Client s3Client;
@@ -13,13 +23,13 @@ public class TrackImportService {
     @Transactional
     public int importPrefix(String prefix) {
         int imported = 0;
-        var pages = s3.listObjectsV2Paginator(b -> b.bucket(bucket).prefix(prefix == null ? "" : prefix.trim()));
+        var pages = s3Client.listObjectsV2Paginator(b -> b.bucket(bucket).prefix(prefix == null ? "" : prefix.trim()));
         for (var page : pages) {
             for (var obj : page.contents()) {
                 String key = obj.key();
                 if (key.endsWith("/")) continue;
 
-                var head = s3.headObject(b -> b.bucket(bucket).key(key));
+                var head = s3Client.headObject(b -> b.bucket(bucket).key(key));
                 var existing = trackRepository.findByS3Key(key).orElse(null);
 
                 String[] parsed = parse(key);
@@ -31,19 +41,10 @@ public class TrackImportService {
                     t.setS3Key(key);
                     t.setTrackArtist(artist);
                     t.setTrackName(title);
-                    t.setContentType(head.contentType());
-                    t.setSizeBytes(head.contentLength());
-                    t.setEtag(head.eTag());
                     trackRepository.save(t);
                     imported++;
                 } else {
                     boolean changed = false;
-                    if (!Objects.equals(existing.getEtag(), head.eTag())) {
-                        existing.setEtag(head.eTag());
-                        existing.setSizeBytes(head.contentLength());
-                        existing.setContentType(head.contentType());
-                        changed = true;
-                    }
                     if (!Objects.equals(existing.getTrackArtist(), artist)) {
                         existing.setTrackArtist(artist);
                         changed = true;

@@ -1,15 +1,9 @@
 package com.example.api.controller;
 
 import com.example.api.entity.Track;
-import com.example.api.repository.TrackRepository;
-
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import com.example.api.service.S3AudioService;
+import com.example.api.service.TrackService;
 import jakarta.persistence.EntityNotFoundException;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.*;
 
 import java.net.URL;
 import java.time.Duration;
@@ -17,63 +11,56 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/tracks")
+@RequestMapping("/api/tracks")
 public class TrackController {
 
-    private final TrackRepository trackRepository;
-    private final S3AudioService s3AudioService;
-    
-    public TrackController(TrackRepository trackRepository, S3AudioService s3AudioService) {
-        this.trackRepository = trackRepository;
-        this.s3AudioService = s3AudioService;
+    private final TrackService trackService;
+
+    public TrackController(TrackService trackService) {
+        this.trackService = trackService;
     }
 
     @GetMapping("/welcome")
-    public String index(){
+    public String welcome() {
         return "Welcome to AK(tion) Radio.";
     }
 
     @GetMapping
-    public List<Map<String, Object>> list() {
-        return trackRepository.findAll().stream()
-            .map(track -> {
-                Map<String, Object> map = new java.util.HashMap<>();
-                map.put("id", track.getTrackId());
-                map.put("name", track.getTrackName());
-                map.put("artist", track.getTrackArtist());
-                return map;
-            })
-            .toList();
+    public List<Track> list() {
+        return trackService.getAllTracks().stream()
+                .map(t -> new Track(t.getTrackId(), t.getTrackName(), t.getTrackArtist(), t.getS3Key()))
+                .toList();
     }
 
-    @GetMapping("/show")
-    public String showTracks(){
-        return "Showing all tracks";
-    }
-
+    // Track metadata (no URL side-effects)
     @GetMapping("/{id}")
-    public Map<String, Object> generatePresignedUrl(@PathVariable Integer id,
-                                               @RequestParam(defaultValue = "10") int minutes) {
-        Track track = trackRepository.findById(id).orElseThrow(() -> new EntityNotFoundException("Track " + id + " not found"));
-        URL url = s3AudioService.generatePresignedUrl(track.getS3Key(), Duration.ofMinutes(minutes));
-                return Map.of(
-                "id", track.getTrackId(),
-                "name", track.getTrackName(),
-                "artist", track.getTrackArtist(),
+    public Track getOne(@PathVariable Integer id) {
+        Track t = trackService.getById(id); 
+        return new Track(
+                t.getTrackId(),
+                t.getTrackName(),
+                t.getTrackArtist(),
+                t.getS3Key()
+        );
+    }
+
+    // Presigned URL endpoint
+    @GetMapping("/{id}/play")
+    public Map<String, Object> presigned(@PathVariable Integer id,
+                                         @RequestParam(defaultValue = "10") int minutes) {
+        if (minutes <= 0) minutes = 10;
+        long max = 7L * 24 * 60; // 7 days
+        if (minutes > max) minutes = (int) max;
+
+        URL url = trackService.getPlaybackUrl(id, Duration.ofMinutes(minutes));
+        Track t = trackService.getById(id);
+        return Map.of(
+                "id", t.getTrackId(),
+                "name", t.getTrackName(),
+                "artist", t.getTrackArtist(),
                 "expiresInMinutes", minutes,
                 "url", url.toString()
         );
     }
 
-    /*@GetMapping
-    public List<Map<String,Object>> list() {
-    return trackRepository.findAll().stream()
-      .map(t -> Map.of(
-        "id", t.getTrackId(),
-        "name", t.getTrackName(),
-        "artist", t.getTrackArtist(),
-        "s3Key", t.getS3Key()))
-      .toList();
-  }*/
 }
-
