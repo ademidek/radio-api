@@ -2,74 +2,112 @@ package com.example.api.service;
 
 import com.example.api.entity.Track;
 import com.example.api.repository.TrackRepository;
+import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.services.s3.S3Client;
-import jakarta.transaction.Transactional;
+import software.amazon.awssdk.services.s3.model.S3Exception;
+
+import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 
 @Service
 public class TrackImportService {
-    private final S3Client s3Client;
-    private final TrackRepository trackRepository;
+
+    private static final Set<String> AUDIO_EXTS =
+            Set.of(".mp3", ".wav", ".flac", ".m4a", ".aac", ".ogg");
+
+    private final S3Client s3;
+    private final TrackRepository repo;
     private final String bucket;
-    
-    public TrackImportService(TrackRepository trackRepository, S3Client s3Client, @Value("${aws.s3.bucket}") String bucket){
-        this.trackRepository = trackRepository;
-        this.s3Client = s3Client;
+
+    public TrackImportService(TrackRepository repo,
+                              S3Client s3,
+                              @Value("${aws.s3.bucket}") String bucket) {
+        this.repo = repo;
+        this.s3 = s3;
         this.bucket = bucket;
     }
 
+    public record ImportResult(int created, int updated) {}
+
     @Transactional
-    public int importPrefix(String prefix) {
-        int imported = 0;
-        var pages = s3Client.listObjectsV2Paginator(b -> b.bucket(bucket).prefix(prefix == null ? "" : prefix.trim()));
-        for (var page : pages) {
-            for (var obj : page.contents()) {
-                String key = obj.key();
-                if (key.endsWith("/")) continue;
+    public ImportResult importPrefix(String prefix) {
+        final String prefixNorm = normalizePrefix(prefix);
 
-                var head = s3Client.headObject(b -> b.bucket(bucket).key(key));
-                var existing = trackRepository.findByS3Key(key).orElse(null);
+        int created = 0;
+        int updated = 0;
 
-                String[] parsed = parse(key);
-                String artist = parsed[0];
-                String title  = parsed[1];
+        try {
+            var pages = s3.listObjectsV2Paginator(b -> b.bucket(bucket).prefix(prefixNorm));
+            // Alternatively (no lambda):
+            // var req = ListObjectsV2Request.builder().bucket(bucket).prefix(prefixNorm).build();
+            // var pages = s3.listObjectsV2Paginator(req);
 
-                if (existing == null) {
-                    var t = new Track();
-                    t.setS3Key(key);
-                    t.setTrackArtist(artist);
-                    t.setTrackName(title);
-                    trackRepository.save(t);
-                    imported++;
-                } else {
-                    boolean changed = false;
-                    if (!Objects.equals(existing.getTrackArtist(), artist)) {
-                        existing.setTrackArtist(artist);
-                        changed = true;
-                    }
-                    if (!Objects.equals(existing.getTrackName(), title)) {
-                        existing.setTrackName(title);
-                        changed = true;
-                    }
-                    if (changed) {
-                        trackRepository.save(existing);
-                        imported++;
+            for (var page : pages) {
+                for (var obj : page.contents()) {
+                    final String key = obj.key();
+                    if (key == null || key.endsWith("/") || !isAudio(key)) continue;
+
+                    // Verifying permissions without lambda:
+                    // s3.headObject(HeadObjectRequest.builder().bucket(bucket).key(key).build());
+
+                    var existing = repo.findByS3Key(key).orElse(null);
+
+                    var parsed = parseFromKey(key);
+                    String artist = parsed.artist();
+                    String title  = parsed.title();
+
+                    if (artist == null || artist.isBlank()) artist = "Unknown";
+
+                    if (existing == null) {
+                        var t = new Track();
+                        t.setS3Key(key);
+                        t.setTrackArtist(artist);
+                        t.setTrackName(title);
+                        repo.save(t);
+                        created++;
+                    } else {
+                        boolean changed = false;
+                        if (!Objects.equals(existing.getTrackArtist(), artist)) { existing.setTrackArtist(artist); changed = true; }
+                        if (!Objects.equals(existing.getTrackName(), title))    { existing.setTrackName(title);    changed = true; }
+                        if (changed) { repo.save(existing); updated++; }
                     }
                 }
             }
+            return new ImportResult(created, updated);
+        } catch (S3Exception | SdkClientException e) {
+            throw new RuntimeException("Failed importing from s3://" + bucket + "/" + prefixNorm + ": " + e.getMessage(), e);
         }
-        return imported;
     }
 
-    private static String[] parse(String key) {
+    private static String normalizePrefix(String prefix) {
+        String p = (prefix == null) ? "" : prefix.trim();
+        if (p.startsWith("/")) p = p.substring(1);
+        return p;
+    }
+
+
+    private static boolean isAudio(String key) {
+        String lower = key.toLowerCase(Locale.ROOT);
+        return AUDIO_EXTS.stream().anyMatch(lower::endsWith);
+    }
+
+    // Parses "Artist - Title.ext" or "Artist/Title.ext" into fields
+    private static Parsed parseFromKey(String key) {
         String base = key.substring(key.lastIndexOf('/') + 1);
         int dot = base.lastIndexOf('.');
         if (dot > 0) base = base.substring(0, dot);
         String artist = null, title = base;
         int sep = base.indexOf(" - ");
-        if (sep > 0) { artist = base.substring(0, sep).trim(); title = base.substring(sep + 3).trim(); }
-        return new String[]{artist, title};
+        if (sep > 0) {
+            artist = base.substring(0, sep).trim();
+            title = base.substring(sep + 3).trim();
+        }
+        return new Parsed(artist, title);
     }
+
+    private record Parsed(String artist, String title) {}
 }

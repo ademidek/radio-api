@@ -16,7 +16,11 @@ public class ImportController {
 
     @PostMapping("/s3")
     public Map<String, Object> importTracksFromS3(@RequestParam(defaultValue = "") String prefix) {
-        int count = importService.importPrefix(prefix);
-        return Map.of("imported", count, "prefix", prefix);
+        var result = importService.importPrefix(prefix);
+        return Map.of(
+            "created", result.created(),
+            "updated", result.updated(),
+            "prefix", prefix
+        );
     }
 }

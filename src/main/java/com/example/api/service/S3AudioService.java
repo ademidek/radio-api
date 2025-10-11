@@ -1,28 +1,23 @@
 package com.example.api.service;
 
+import jakarta.annotation.PreDestroy;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import software.amazon.awssdk.core.exception.SdkClientException;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
+import software.amazon.awssdk.services.s3.model.S3Exception;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.paginators.ListObjectsV2Iterable;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+
 import java.net.URL;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-
-import jakarta.annotation.PreDestroy;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-
-import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
-import software.amazon.awssdk.core.exception.SdkClientException;
-import software.amazon.awssdk.regions.Region;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.S3Object;
-import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
-import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
-import software.amazon.awssdk.services.s3.paginators.ListObjectsV2Iterable;
-import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
-import software.amazon.awssdk.services.s3.model.S3Exception;
-import software.amazon.awssdk.services.s3.model.GetObjectRequest;
-import software.amazon.awssdk.services.s3.presigner.S3Presigner;
-import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 
 @Service
 public class S3AudioService {
@@ -31,31 +26,19 @@ public class S3AudioService {
     private static final Duration MAX_PRESIGN = Duration.ofDays(7);
 
     private final String bucket;
+    //injected beans
     private final S3Presigner presigner;
-    private final S3Client s3;
+    private final S3Client s3;          
 
     public S3AudioService(@Value("${aws.s3.bucket}") String bucket,
-                          @Value("${aws.region}") String region) {
+                          S3Presigner presigner,
+                          S3Client s3) {
         if (bucket == null || bucket.isBlank()) {
             throw new IllegalStateException("aws.s3.bucket is required");
         }
-        if (region == null || region.isBlank()) {
-            throw new IllegalStateException("aws.region is required");
-        }
-
         this.bucket = bucket.trim();
-        var creds = DefaultCredentialsProvider.create();
-        var reg = Region.of(region.trim());
-
-        this.presigner = S3Presigner.builder()
-                .region(reg)
-                .credentialsProvider(creds)
-                .build();
-
-        this.s3 = S3Client.builder()
-                .region(reg)
-                .credentialsProvider(creds)
-                .build();
+        this.presigner = presigner;
+        this.s3 = s3;
     }
 
     public URL generatePresignedUrl(String s3Key, Duration requested) {
@@ -69,7 +52,7 @@ public class S3AudioService {
             throw new RuntimeException("Failed to verify S3 object: " + key, e);
         }
 
-        Duration duration = normalizeDuration(requested);
+        Duration ttl = normalizeDuration(requested);
 
         GetObjectRequest get = GetObjectRequest.builder()
                 .bucket(bucket)
@@ -77,7 +60,7 @@ public class S3AudioService {
                 .build();
 
         GetObjectPresignRequest req = GetObjectPresignRequest.builder()
-                .signatureDuration(duration)
+                .signatureDuration(ttl)
                 .getObjectRequest(get)
                 .build();
 
@@ -92,11 +75,11 @@ public class S3AudioService {
         );
 
         List<String> keys = new ArrayList<>();
-        for (var page : pages) {                 
-                for (var obj : page.contents()) {    
+        for (var page : pages) {
+            for (var obj : page.contents()) {
                 String key = obj.key();
                 if (key != null && !key.endsWith("/")) {
-                        keys.add(key);
+                    keys.add(key);
                 }
             }
         }
@@ -104,18 +87,11 @@ public class S3AudioService {
     }
 
     private static Duration normalizeDuration(Duration d) {
-        if (d == null || d.isZero() || d.isNegative()) {
-            return DEFAULT_PRESIGN;
-        }
+        if (d == null || d.isZero() || d.isNegative()) return DEFAULT_PRESIGN;
         return d.compareTo(MAX_PRESIGN) > 0 ? MAX_PRESIGN : d;
     }
 
     @PreDestroy
     public void close() {
-        try {
-            if (presigner != null) presigner.close();
-        } finally {
-            if (s3 != null) s3.close();
-        }
     }
 }
