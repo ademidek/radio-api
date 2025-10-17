@@ -86,7 +86,11 @@ public class Track {
     public String toString() {
         return "Track: " + trackName +
                 ", trackId=" + trackId +
-                ", trackArtist=" + trackArtist;
+                ", trackArtist=" + trackArtist +
+                ", s3Key=" + s3Key +
+                ", duration=" + duration; 
+
+
     }
 
 
