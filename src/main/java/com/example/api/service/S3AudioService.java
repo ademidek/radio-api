@@ -26,7 +26,6 @@ public class S3AudioService {
     private static final Duration MAX_PRESIGN = Duration.ofDays(7);
 
     private final String bucket;
-    //injected beans
     private final S3Presigner presigner;
     private final S3Client s3;          
 
