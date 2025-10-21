@@ -64,7 +64,6 @@
     <dependency>
       <groupId>software.amazon.awssdk</groupId>
       <artifactId>sts</artifactId>
-      <optional>true</optional>
     </dependency>
     <dependency>
       <groupId>org.flywaydb</groupId>
